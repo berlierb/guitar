@@ -1,0 +1,1912 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guitar Practice — Tuner & Metronome</title>
+<meta name="theme-color" content="#12141a">
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
+<style>
+  :root{
+    --bg:#12141a;
+    --panel:#1b1e27;
+    --panel2:#20242f;
+    --accent:#e8b84b;
+    --accent2:#5bc0a3;
+    --text:#eceef2;
+    --muted:#8a90a2;
+    --danger:#e0605a;
+    --good:#5bc0a3;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:linear-gradient(180deg,#0f1116,#161923);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    min-height:100vh;
+    padding:24px 16px 60px;
+  }
+  .wrap{max-width:720px;margin:0 auto;}
+  h1{
+    text-align:center;
+    font-size:1.5rem;
+    margin:0 0 6px;
+    letter-spacing:.5px;
+  }
+  .subtitle{text-align:center;color:var(--muted);margin-bottom:28px;font-size:.9rem;}
+  .tabs{
+    display:flex;
+    gap:8px;
+    margin-bottom:20px;
+    background:var(--panel);
+    padding:6px;
+    border-radius:14px;
+  }
+  .tab-btn{
+    flex:1;
+    padding:12px;
+    border:none;
+    border-radius:10px;
+    background:transparent;
+    color:var(--muted);
+    font-size:1rem;
+    font-weight:600;
+    cursor:pointer;
+    transition:.15s;
+  }
+  .tab-btn.active{
+    background:var(--accent);
+    color:#1a1a1a;
+  }
+  .card{
+    position:relative;
+    background:var(--panel);
+    border-radius:18px;
+    padding:24px;
+    box-shadow:0 8px 24px rgba(0,0,0,.25);
+  }
+  .float-icon-btn{
+    position:absolute;
+    top:14px;
+    left:14px;
+    width:34px;
+    height:34px;
+    border:none;
+    border-radius:8px;
+    background:var(--panel2);
+    color:var(--muted);
+    font-size:1.05rem;
+    line-height:1;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:2;
+  }
+  .float-icon-btn.active{background:var(--accent);color:#1a1a1a;}
+  .panel{display:none;}
+  .panel.active{display:block;}
+
+  /* ---- Tuner ---- */
+  .tuner-status{
+    text-align:center;
+    color:var(--muted);
+    font-size:.85rem;
+    margin-bottom:18px;
+    min-height:1.2em;
+  }
+  .mic-btn{
+    display:block;
+    margin:20px auto 0;
+    padding:14px 28px;
+    border:none;
+    border-radius:30px;
+    background:var(--accent);
+    color:#1a1a1a;
+    font-size:1rem;
+    font-weight:700;
+    cursor:pointer;
+  }
+  .mic-btn.listening{background:var(--danger);color:#fff;}
+
+  .note-display{
+    text-align:center;
+    margin-bottom:8px;
+  }
+  .note-name{
+    font-size:clamp(2.2rem, 11vw, 4rem);
+    font-weight:800;
+    line-height:1;
+  }
+  .freq-line{color:var(--muted);font-size:.95rem;margin-top:4px;}
+
+  .meter{
+    position:relative;
+    height:70px;
+    margin:18px auto 24px;
+    max-width:440px;
+  }
+  .meter-track{
+    position:absolute;
+    left:0;right:0;top:30px;
+    height:6px;
+    background:#2a2f3d;
+    border-radius:4px;
+  }
+  .meter-track::before{
+    content:"";
+    position:absolute;
+    left:50%;top:-8px;
+    width:2px;height:22px;
+    background:var(--muted);
+    transform:translateX(-50%);
+  }
+  .meter-needle{
+    position:absolute;
+    top:6px;
+    width:4px;height:32px;
+    background:var(--good);
+    border-radius:2px;
+    left:50%;
+    transform:translateX(-50%);
+    transition:left .12s ease-out, background .12s;
+  }
+  .meter-labels{
+    display:flex;
+    justify-content:space-between;
+    color:var(--muted);
+    font-size:.75rem;
+    padding:0 2px;
+  }
+
+  .strings{
+    display:grid;
+    grid-template-columns:repeat(6,1fr);
+    gap:8px;
+    margin-top:10px;
+  }
+  .string-chip{
+    text-align:center;
+    padding:10px 4px;
+    border-radius:10px;
+    background:var(--panel2);
+    color:var(--muted);
+    font-size:.85rem;
+    font-weight:600;
+    cursor:pointer;
+    transition:.15s;
+    border:2px solid transparent;
+  }
+  .string-chip .hz{display:block;font-size:.68rem;color:#5c6275;font-weight:400;margin-top:2px;}
+  .string-chip.active{
+    color:var(--text);
+    border-color:var(--accent);
+    background:#2a2417;
+  }
+  .string-chip.in-tune{
+    border-color:var(--good);
+    background:#16261f;
+  }
+
+  /* ---- Metronome ---- */
+  .bpm-display{
+    text-align:center;
+    margin-bottom:6px;
+  }
+  .bpm-value{
+    font-size:clamp(2.6rem, 13vw, 4.5rem);
+    font-weight:800;
+    line-height:1;
+  }
+  .bpm-label{color:var(--muted);font-size:.9rem;}
+
+  .bpm-controls{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:16px;
+    margin:18px 0 8px;
+  }
+  .step-btn{
+    width:48px;height:48px;
+    border-radius:50%;
+    border:none;
+    background:var(--panel2);
+    color:var(--text);
+    font-size:1.4rem;
+    cursor:pointer;
+  }
+  .step-btn:active{background:#2a2f3d;}
+
+  input[type=range]{
+    width:100%;
+    accent-color:var(--accent);
+    margin:10px 0 20px;
+  }
+
+  .row{
+    display:flex;
+    gap:12px;
+    margin-bottom:16px;
+    flex-wrap:wrap;
+  }
+  .field{flex:1;min-width:120px;}
+  .field label{
+    display:block;
+    color:var(--muted);
+    font-size:.78rem;
+    margin-bottom:6px;
+    text-transform:uppercase;
+    letter-spacing:.5px;
+  }
+  select{
+    width:100%;
+    padding:10px;
+    border-radius:10px;
+    background:var(--panel2);
+    color:var(--text);
+    border:1px solid #2c3140;
+    font-size:.95rem;
+  }
+
+  .beats{
+    display:flex;
+    gap:8px;
+    justify-content:center;
+    margin:20px 0;
+  }
+  .beat-dot{
+    width:20px;height:20px;
+    border-radius:50%;
+    background:#2a2f3d;
+    transition:.08s;
+  }
+  .beat-dot.on{background:var(--accent2);transform:scale(1.25);}
+  .beat-dot.accent-on{background:var(--accent);transform:scale(1.35);}
+
+  .main-controls{
+    display:flex;
+    gap:12px;
+    margin-top:8px;
+  }
+  .play-btn{
+    flex:2;
+    padding:16px;
+    border:none;
+    border-radius:14px;
+    background:var(--accent);
+    color:#1a1a1a;
+    font-size:1.1rem;
+    font-weight:700;
+    cursor:pointer;
+  }
+  .play-btn.playing{background:var(--danger);color:#fff;}
+  .tap-btn{
+    flex:1;
+    padding:16px;
+    border:none;
+    border-radius:14px;
+    background:var(--panel2);
+    color:var(--text);
+    font-size:1rem;
+    font-weight:600;
+    cursor:pointer;
+  }
+
+  .tempo-presets{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    margin-top:16px;
+    justify-content:center;
+  }
+
+  .volume-box{
+    margin-top:24px;
+    padding:14px 16px;
+    background:var(--panel2);
+    border-radius:12px;
+    border:1px solid #2c3140;
+  }
+  .volume-box label{
+    display:block;
+    color:var(--muted);
+    font-size:.78rem;
+    margin-bottom:6px;
+    text-transform:uppercase;
+    letter-spacing:.5px;
+  }
+  .volume-box label span{color:var(--accent2);font-weight:700;}
+  .volume-box input[type=range]{
+    accent-color:var(--accent2);
+    margin:4px 0 0;
+  }
+  .volume-box .field{margin-bottom:14px;}
+  .volume-box select{background:#262b38;}
+
+  .trim-times{
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    gap:8px;
+    color:var(--accent2);
+    font-weight:700;
+    font-size:.95rem;
+    margin-bottom:10px;
+  }
+  .trim-sep{color:var(--muted);font-weight:400;}
+  .waveform-wrap{
+    position:relative;
+    width:100%;
+    height:90px;
+    background:#12151c;
+    border-radius:8px;
+    overflow:hidden;
+    touch-action:none;
+  }
+  .waveform-wrap canvas{
+    display:block;
+    width:100%;
+    height:100%;
+  }
+  .trim-region{
+    position:absolute;
+    top:0;bottom:0;
+    left:0;width:100%;
+    background:rgba(232,184,75,.18);
+    pointer-events:none;
+  }
+  .trim-handle{
+    position:absolute;
+    top:0;bottom:0;
+    left:0;
+    width:18px;
+    margin-left:-9px;
+    cursor:ew-resize;
+    touch-action:none;
+  }
+  .trim-handle::before{
+    content:"";
+    position:absolute;
+    top:0;bottom:0;
+    left:50%;
+    width:3px;
+    transform:translateX(-50%);
+    background:var(--accent2);
+    border-radius:2px;
+  }
+  .trim-handle::after{
+    content:"";
+    position:absolute;
+    top:-3px;
+    left:50%;
+    width:16px;height:16px;
+    transform:translateX(-50%);
+    background:var(--accent2);
+    border-radius:50%;
+    border:2px solid var(--panel2);
+  }
+  .trim-playhead{
+    position:absolute;
+    top:0;bottom:0;
+    left:0;
+    width:2px;
+    background:#fff;
+    box-shadow:0 0 5px rgba(255,255,255,.7);
+    pointer-events:none;
+  }
+  .preset-btn{
+    padding:8px 14px;
+    border-radius:20px;
+    border:1px solid #2c3140;
+    background:transparent;
+    color:var(--muted);
+    font-size:.8rem;
+    cursor:pointer;
+  }
+  .preset-btn:hover{border-color:var(--accent);color:var(--text);}
+
+  .app-logo{
+    display:block;
+    margin:0 auto 14px;
+    width:44px;
+    height:44px;
+  }
+
+  footer{
+    text-align:center;
+    color:#4a4f5e;
+    font-size:.75rem;
+    margin-top:14px;
+  }
+
+  /* Compact layout so everything fits without scrolling on phone screens
+     (e.g. iPhone 16) — tightens vertical spacing across both panels. */
+  @media (max-width: 480px){
+    body{padding:14px 14px 18px;}
+    h1{font-size:1.25rem;margin-bottom:3px;}
+    .subtitle{font-size:.8rem;margin-bottom:14px;}
+    .tabs{margin-bottom:12px;}
+    .tab-btn{padding:9px;font-size:.92rem;}
+    .card{padding:16px;}
+    .float-icon-btn{top:10px;left:10px;width:28px;height:28px;font-size:.9rem;}
+
+    .mic-btn{margin:14px auto 0;padding:11px 22px;font-size:.95rem;}
+    .tuner-status{margin-bottom:10px;font-size:.78rem;}
+    .note-display{margin-bottom:2px;}
+    .freq-line{font-size:.85rem;}
+    .meter{height:56px;margin:10px auto 14px;}
+    .strings{gap:6px;}
+    .string-chip{padding:8px 4px;font-size:.78rem;}
+
+    .bpm-display{margin-bottom:0;}
+    .bpm-controls{margin:10px 0 4px;gap:10px;}
+    .step-btn{width:40px;height:40px;font-size:1.2rem;}
+    input[type=range]{margin:6px 0 10px;}
+    .row{margin-bottom:10px;gap:8px;}
+    .field label{margin-bottom:4px;}
+    select{padding:8px;font-size:.88rem;}
+
+    .beats{margin:10px 0;gap:6px;}
+    .beat-dot{width:16px;height:16px;}
+
+    .main-controls{margin-top:4px;gap:8px;}
+    .play-btn,.tap-btn{padding:12px;font-size:.98rem;}
+
+    .tempo-presets{margin-top:10px;gap:6px;}
+    .preset-btn{padding:6px 10px;font-size:.72rem;}
+
+    .volume-box{margin-top:12px;padding:10px 12px;}
+
+    .app-logo{width:34px;height:34px;margin:0 auto 10px;}
+    footer{margin-top:8px;font-size:.65rem;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <img src="logo-192.png" alt="Guitar Practice" class="app-logo">
+
+  <div class="tabs">
+    <button class="tab-btn" data-tab="tuner">Tuner</button>
+    <button class="tab-btn active" data-tab="metronome">Metronome</button>
+    <button class="tab-btn" data-tab="loop">Loop</button>
+  </div>
+
+  <!-- TUNER PANEL -->
+  <div class="card panel" id="panel-tuner">
+    <div class="tuner-status" id="tunerStatus">Allow microphone access to get started</div>
+
+    <div class="note-display">
+      <div class="note-name" id="noteName">—</div>
+      <div class="freq-line" id="freqLine">&nbsp;</div>
+    </div>
+
+    <div class="meter">
+      <div class="meter-track">
+        <div class="meter-needle" id="needle" style="left:50%"></div>
+      </div>
+      <div class="meter-labels">
+        <span>−50¢</span><span>In tune</span><span>+50¢</span>
+      </div>
+    </div>
+
+    <div class="strings" id="strings"></div>
+
+    <button class="mic-btn" id="micBtn">Start</button>
+  </div>
+
+  <!-- METRONOME PANEL -->
+  <div class="card panel active" id="panel-metronome">
+    <button class="float-icon-btn" id="floatBtn" title="Pop out as a floating window (Chrome/Edge desktop)">🗗</button>
+    <div class="tuner-status" id="floatStatus" style="position:absolute;top:54px;left:14px;max-width:170px;text-align:left;margin:0;font-size:.68rem;line-height:1.3;">&nbsp;</div>
+
+    <div class="bpm-display">
+      <div class="bpm-value" id="bpmValue">100</div>
+      <div class="bpm-label">BPM</div>
+    </div>
+
+    <div class="bpm-controls">
+      <button class="step-btn" id="bpmMinus10">−10</button>
+      <button class="step-btn" id="bpmMinus1">−1</button>
+      <button class="step-btn" id="bpmPlus1">+1</button>
+      <button class="step-btn" id="bpmPlus10">+10</button>
+    </div>
+
+    <input type="range" id="bpmSlider" min="30" max="250" value="100">
+
+    <div class="row">
+      <div class="field">
+        <label>Time signature</label>
+        <select id="beatsPerBar">
+          <option value="2">2/4</option>
+          <option value="3">3/4</option>
+          <option value="4" selected>4/4</option>
+          <option value="5">5/4</option>
+          <option value="6">6/8</option>
+          <option value="7">7/8</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Subdivision</label>
+        <select id="subdivision">
+          <option value="1" selected>Quarter notes</option>
+          <option value="2">Eighth notes</option>
+          <option value="3">Triplets</option>
+          <option value="4">Sixteenth notes</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="beats" id="beatsRow"></div>
+
+    <div class="main-controls">
+      <button class="play-btn" id="playBtn">▶ Start</button>
+      <button class="tap-btn" id="tapBtn">Tap Tempo</button>
+    </div>
+
+    <div class="tempo-presets" id="presets"></div>
+
+    <div class="volume-box">
+      <div class="field">
+        <label>Click sound</label>
+        <select id="soundType">
+          <option value="click" selected>Sharp click</option>
+          <option value="wood">Wood</option>
+          <option value="beep">Electronic beep</option>
+        </select>
+      </div>
+      <label>🔊 Click volume <span id="volumeValue">160%</span></label>
+      <input type="range" id="volumeSlider" min="50" max="250" value="160">
+    </div>
+
+    <div class="tuner-status" id="metroWakeNote">&nbsp;</div>
+  </div>
+
+  <!-- LOOP PANEL -->
+  <div class="card panel" id="panel-loop">
+    <div class="tuner-status" id="loopStatus">Tap to record your loop</div>
+
+    <button class="mic-btn" id="loopMainBtn">🔴 Record</button>
+
+    <button class="preset-btn" id="loopOpenFileBtn" style="display:block;margin:0 auto 14px;">📂 Open an audio file</button>
+    <input type="file" id="loopFileInput" accept="audio/*" style="display:none;">
+
+    <div id="loopSecondaryControls" style="display:none;">
+      <div class="main-controls">
+        <button class="tap-btn" id="loopPauseBtn">⏸ Pause</button>
+        <button class="tap-btn" id="loopClearBtn">🗑 Clear</button>
+      </div>
+      <div class="main-controls" style="margin-top:8px;">
+        <button class="tap-btn" id="loopTrimToggleBtn">✂️ Trim</button>
+        <button class="tap-btn" id="loopDownloadBtn">💾 Download</button>
+      </div>
+    </div>
+
+    <div class="volume-box" id="loopTrimPanel" style="display:none;">
+      <div class="trim-times">
+        <span id="trimStartLabel">0:00</span>
+        <span class="trim-sep">→</span>
+        <span id="trimEndLabel">0:00</span>
+      </div>
+      <div class="waveform-wrap" id="waveformWrap">
+        <canvas id="trimCanvas"></canvas>
+        <div class="trim-region" id="trimRegion"></div>
+        <div class="trim-playhead" id="trimPlayhead"></div>
+        <div class="trim-handle" id="trimHandleStart"></div>
+        <div class="trim-handle" id="trimHandleEnd"></div>
+      </div>
+      <div class="tuner-status" style="margin:6px 0 0;font-size:.72rem;">Tap the waveform to start the preview from that point</div>
+      <div class="main-controls" style="margin-top:14px;">
+        <button class="tap-btn" id="trimPreviewBtn">▶ Preview (loop)</button>
+        <button class="tap-btn" id="trimApplyBtn">✅ Apply</button>
+        <button class="tap-btn" id="trimCancelBtn">✖ Cancel</button>
+      </div>
+    </div>
+
+    <div class="volume-box">
+      <label>🔊 Loop volume <span id="loopVolumeValue">100%</span></label>
+      <input type="range" id="loopVolumeSlider" min="0" max="200" value="100">
+    </div>
+
+    <div class="tuner-status" id="loopWakeNote">&nbsp;</div>
+  </div>
+
+  <footer>Runs entirely in your browser — no audio data is ever sent anywhere.</footer>
+</div>
+
+<script>
+/* =========================================================
+   WAKE LOCK (keeps the screen from auto-locking while the
+   metronome is running or the tuner is listening)
+   ========================================================= */
+const WakeLockManager = (function(){
+  let sentinel = null;
+  const requesters = new Set();
+  const listeners = [];
+
+  function notify(){
+    const active = !!sentinel;
+    const supported = 'wakeLock' in navigator;
+    listeners.forEach(fn => fn(active, supported));
+  }
+
+  async function acquire(){
+    if(!('wakeLock' in navigator)) { notify(); return false; }
+    if(sentinel) return true;
+    try{
+      sentinel = await navigator.wakeLock.request('screen');
+      sentinel.addEventListener('release', ()=>{ sentinel = null; notify(); });
+      notify();
+      return true;
+    }catch(e){
+      console.warn('Wake lock denied', e);
+      sentinel = null;
+      notify();
+      return false;
+    }
+  }
+
+  function releaseIfIdle(){
+    if(requesters.size === 0 && sentinel){
+      sentinel.release().catch(()=>{});
+      sentinel = null;
+      notify();
+    }
+  }
+
+  async function activate(name){
+    requesters.add(name);
+    await acquire();
+  }
+  function deactivate(name){
+    requesters.delete(name);
+    releaseIfIdle();
+  }
+  function onChange(fn){ listeners.push(fn); }
+
+  document.addEventListener('visibilitychange', async ()=>{
+    if(document.visibilityState === 'visible' && requesters.size > 0){
+      await acquire();
+    }
+  });
+
+  return { activate, deactivate, onChange, isSupported: ()=> 'wakeLock' in navigator };
+})();
+
+/* =========================================================
+   TAB LIFECYCLE — lets each feature register a "stop" handler
+   that runs automatically when the user switches away from
+   its tab (metronome keeps clicking, mic stays open, etc.
+   otherwise).
+   ========================================================= */
+const TabLifecycle = (function(){
+  const stoppers = {};
+  const starters = {};
+  function registerStop(tab, fn){ stoppers[tab] = fn; }
+  function registerStart(tab, fn){ starters[tab] = fn; }
+  function stop(tab){ if(stoppers[tab]) stoppers[tab](); }
+  function start(tab){ if(starters[tab]) starters[tab](); }
+  return { registerStop, registerStart, stop, start };
+})();
+
+/* =========================================================
+   MIC INPUT — "raw" capture, no automatic processing
+   ========================================================= */
+// Used by both the Tuner and the Loop recorder. We first request the
+// constraints in {exact:false} mode: this forces the browser to actually
+// disable echo cancellation / noise suppression / auto-gain, or fail with
+// an OverconstrainedError — rather than silently accepting a "hint" it's
+// free to ignore. We also add the legacy "goog*" prefixes (Chrome), which
+// sometimes still matter on devices where the standard name alone isn't
+// enough to fully turn off the internal AGC. As a fallback, if the device
+// truly can't satisfy the exact constraints, we retry with the plain
+// "soft hint" version so recording isn't blocked entirely.
+async function getRawMicStream(){
+  const strict = {
+    audio: {
+      echoCancellation: {exact:false},
+      noiseSuppression: {exact:false},
+      autoGainControl: {exact:false},
+      googEchoCancellation: false,
+      googAutoGainControl: false,
+      googAutoGainControl2: false,
+      googNoiseSuppression: false
+    }
+  };
+  try{
+    return await navigator.mediaDevices.getUserMedia(strict);
+  }catch(err){
+    if(err.name === 'OverconstrainedError'){
+      return await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation:false, noiseSuppression:false, autoGainControl:false }
+      });
+    }
+    throw err;
+  }
+}
+
+/* =========================================================
+   METRONOME
+   ========================================================= */
+(function(){
+  const bpmValue = document.getElementById('bpmValue');
+  const bpmSlider = document.getElementById('bpmSlider');
+  const playBtn = document.getElementById('playBtn');
+  const tapBtn = document.getElementById('tapBtn');
+  const beatsRow = document.getElementById('beatsRow');
+  const beatsPerBarSel = document.getElementById('beatsPerBar');
+  const subdivisionSel = document.getElementById('subdivision');
+  const presetsEl = document.getElementById('presets');
+  const volumeSlider = document.getElementById('volumeSlider');
+  const volumeValue = document.getElementById('volumeValue');
+  const metroWakeNote = document.getElementById('metroWakeNote');
+  const soundTypeSel = document.getElementById('soundType');
+
+  let bpm = 100;
+  let beatsPerBar = 4;
+  let subdivision = 1;
+  let isPlaying = false;
+  let volumeMultiplier = 1.6;
+  let soundType = 'click';
+  let pipWindow = null; // declared early: setBpm(100) below calls updatePipBpm(),
+                        // which reads this — must exist before that first call.
+
+  let audioCtx = null;
+  let masterGain = null;
+  let compressor = null;
+  let noiseBuffer = null;
+  let nextNoteTime = 0.0;
+  let currentSubBeat = 0; // counts subdivided ticks
+  let schedulerTimer = null;
+  const lookahead = 25.0; // ms
+  const scheduleAheadTime = 0.1; // seconds
+
+  volumeSlider.addEventListener('input', e=>{
+    volumeMultiplier = e.target.value / 100;
+    volumeValue.textContent = e.target.value + '%';
+    if(masterGain) masterGain.gain.setValueAtTime(volumeMultiplier, audioCtx.currentTime);
+  });
+
+  soundTypeSel.addEventListener('change', e=>{
+    soundType = e.target.value;
+  });
+
+  WakeLockManager.onChange((active, supported)=>{
+    if(!isPlaying){ metroWakeNote.textContent = ''; return; }
+    if(!supported){
+      metroWakeNote.textContent = "Your browser can't keep the screen on automatically — you may want to disable auto-lock in your phone settings while you play.";
+    } else if(active){
+      metroWakeNote.textContent = "📱 Screen kept on while the metronome is running";
+    }
+  });
+
+  const presets = [
+    {label:'Largo 50', v:50},
+    {label:'Andante 76', v:76},
+    {label:'Moderato 108', v:108},
+    {label:'Allegro 132', v:132},
+    {label:'Presto 168', v:168}
+  ];
+  presets.forEach(p=>{
+    const b = document.createElement('button');
+    b.className='preset-btn';
+    b.textContent = p.label;
+    b.addEventListener('click', ()=> setBpm(p.v));
+    presetsEl.appendChild(b);
+  });
+
+  function setBpm(v){
+    bpm = Math.min(250, Math.max(30, Math.round(v)));
+    bpmValue.textContent = bpm;
+    bpmSlider.value = bpm;
+    updatePipBpm();
+  }
+  setBpm(100);
+
+  bpmSlider.addEventListener('input', e=> setBpm(e.target.value));
+  document.getElementById('bpmMinus10').addEventListener('click', ()=> setBpm(bpm-10));
+  document.getElementById('bpmMinus1').addEventListener('click', ()=> setBpm(bpm-1));
+  document.getElementById('bpmPlus1').addEventListener('click', ()=> setBpm(bpm+1));
+  document.getElementById('bpmPlus10').addEventListener('click', ()=> setBpm(bpm+10));
+
+  beatsPerBarSel.addEventListener('change', e=>{
+    beatsPerBar = parseInt(e.target.value,10);
+    buildBeatsRow();
+  });
+  subdivisionSel.addEventListener('change', e=>{
+    subdivision = parseInt(e.target.value,10);
+  });
+
+  function buildBeatsRow(){
+    beatsRow.innerHTML='';
+    const totalDots = beatsPerBar;
+    for(let i=0;i<totalDots;i++){
+      const d = document.createElement('div');
+      d.className='beat-dot';
+      d.dataset.beat = i;
+      beatsRow.appendChild(d);
+    }
+  }
+  buildBeatsRow();
+
+  function highlightBeat(beatIndex, isAccent){
+    const dots = beatsRow.querySelectorAll('.beat-dot');
+    dots.forEach(d=>d.classList.remove('on','accent-on'));
+    const d = dots[beatIndex % dots.length];
+    if(d) d.classList.add(isAccent ? 'accent-on' : 'on');
+  }
+
+  function ensureAudioGraph(){
+    if(!masterGain){
+      // Signal path: per-click gain -> compressor (fixed shaping/limiting,
+      // always sees the same input level) -> masterGain (the ONLY place the
+      // volume slider acts) -> destination. Volume must live after the
+      // compressor — putting it before means the compressor's ratio just
+      // squashes the level right back down, making the slider feel dead.
+      compressor = audioCtx.createDynamicsCompressor();
+      compressor.threshold.setValueAtTime(-18, audioCtx.currentTime);
+      compressor.knee.setValueAtTime(8, audioCtx.currentTime);
+      compressor.ratio.setValueAtTime(6, audioCtx.currentTime);
+      compressor.attack.setValueAtTime(0.001, audioCtx.currentTime);
+      compressor.release.setValueAtTime(0.1, audioCtx.currentTime);
+      masterGain = audioCtx.createGain();
+      masterGain.gain.value = volumeMultiplier;
+      compressor.connect(masterGain);
+      masterGain.connect(audioCtx.destination);
+    }
+    if(!noiseBuffer){
+      // Precomputed once and reused (a new AudioBufferSourceNode is cheap
+      // to create per click, but generating the noise data every time isn't).
+      const len = Math.floor(audioCtx.sampleRate * 0.08);
+      noiseBuffer = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+      const data = noiseBuffer.getChannelData(0);
+      for(let i=0;i<len;i++){ data[i] = Math.random()*2 - 1; }
+    }
+  }
+
+  function playClickTone(time, isAccent){
+    // "Sharp click" — a short square-wave burst around 2-3kHz, where the
+    // ear is most sensitive (equal-loudness curves), so it reads as louder
+    // than a 1kHz tone at the same amplitude on tiny phone speakers.
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.frequency.value = isAccent ? 2400 : 1800;
+    osc.type = 'square';
+    const peak = isAccent ? 1.0 : 0.7;
+    gain.gain.setValueAtTime(peak, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.07);
+    osc.connect(gain);
+    gain.connect(compressor);
+    osc.start(time);
+    osc.stop(time + 0.08);
+  }
+
+  function playWood(time, isAccent){
+    // "Wood" — filtered noise burst, like a woodblock/clave knock.
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = noiseBuffer;
+    const bandpass = audioCtx.createBiquadFilter();
+    bandpass.type = 'bandpass';
+    bandpass.frequency.value = isAccent ? 1700 : 1100;
+    bandpass.Q.value = 6;
+    const gain = audioCtx.createGain();
+    const peak = isAccent ? 1.0 : 0.7;
+    gain.gain.setValueAtTime(peak, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.045);
+    noise.connect(bandpass);
+    bandpass.connect(gain);
+    gain.connect(compressor);
+    noise.start(time);
+    noise.stop(time + 0.06);
+  }
+
+  function playBeep(time, isAccent){
+    // "Electronic beep" — softer sine beep, longer than the click.
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.frequency.value = isAccent ? 1400 : 950;
+    osc.type = 'sine';
+    const peak = isAccent ? 1.0 : 0.65;
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.exponentialRampToValueAtTime(peak, time + 0.005);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.12);
+    osc.connect(gain);
+    gain.connect(compressor);
+    osc.start(time);
+    osc.stop(time + 0.13);
+  }
+
+  function playClick(time, isAccent){
+    if(soundType === 'wood') playWood(time, isAccent);
+    else if(soundType === 'beep') playBeep(time, isAccent);
+    else playClickTone(time, isAccent);
+  }
+
+  function scheduler(){
+    while(nextNoteTime < audioCtx.currentTime + scheduleAheadTime){
+      const ticksPerBar = beatsPerBar * subdivision;
+      const beatIndex = Math.floor(currentSubBeat / subdivision) % beatsPerBar;
+      const isDownbeat = (currentSubBeat % subdivision === 0);
+      const isAccent = isDownbeat && (Math.floor(currentSubBeat / subdivision) % beatsPerBar === 0);
+
+      if(isDownbeat){
+        playClick(nextNoteTime, isAccent);
+      } else {
+        playClick(nextNoteTime, false); // subdivision tick, softer handled via gain diff below
+      }
+
+      const capturedBeat = beatIndex;
+      const capturedAccent = isAccent;
+      const capturedIsDownbeat = isDownbeat;
+      const delay = (nextNoteTime - audioCtx.currentTime) * 1000;
+      setTimeout(()=>{
+        if(capturedIsDownbeat) highlightBeat(capturedBeat, capturedAccent);
+      }, Math.max(0, delay));
+
+      const secondsPerBeat = 60.0 / bpm;
+      const secondsPerTick = secondsPerBeat / subdivision;
+      nextNoteTime += secondsPerTick;
+      currentSubBeat = (currentSubBeat + 1) % ticksPerBar;
+    }
+    schedulerTimer = setTimeout(scheduler, lookahead);
+  }
+
+  function start(){
+    if(isPlaying) return;
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+    ensureAudioGraph();
+    isPlaying = true;
+    currentSubBeat = 0;
+    nextNoteTime = audioCtx.currentTime + 0.05;
+    playBtn.textContent = '■ Stop';
+    playBtn.classList.add('playing');
+    WakeLockManager.activate('metronome');
+    scheduler();
+    updatePipPlayState();
+  }
+
+  function stop(){
+    isPlaying = false;
+    playBtn.textContent = '▶ Start';
+    playBtn.classList.remove('playing');
+    clearTimeout(schedulerTimer);
+    beatsRow.querySelectorAll('.beat-dot').forEach(d=>d.classList.remove('on','accent-on'));
+    WakeLockManager.deactivate('metronome');
+    metroWakeNote.textContent = '';
+    updatePipPlayState();
+  }
+
+  playBtn.addEventListener('click', ()=>{
+    if(isPlaying) stop(); else start();
+  });
+
+  // Tap tempo
+  let tapTimes = [];
+  tapBtn.addEventListener('click', ()=>{
+    const now = performance.now();
+    tapTimes = tapTimes.filter(t => now - t < 2500);
+    tapTimes.push(now);
+    if(tapTimes.length >= 2){
+      const intervals = [];
+      for(let i=1;i<tapTimes.length;i++) intervals.push(tapTimes[i]-tapTimes[i-1]);
+      const avg = intervals.reduce((a,b)=>a+b,0)/intervals.length;
+      const newBpm = 60000/avg;
+      setBpm(newBpm);
+    }
+    tapBtn.textContent = 'Tap Tempo ✓';
+    setTimeout(()=> tapBtn.textContent = 'Tap Tempo', 200);
+  });
+
+  /* ---- Floating window (Document Picture-in-Picture) ----
+     Chrome/Edge on desktop only, as of writing — Firefox and Safari don't
+     implement this API yet, and neither does mobile Chrome. We detect and
+     show a plain message rather than hiding the button, so it's clear why
+     nothing happens if someone tries it on an unsupported browser. */
+  const floatBtn = document.getElementById('floatBtn');
+  const floatStatus = document.getElementById('floatStatus');
+
+  function updatePipBpm(){
+    if(pipWindow && !pipWindow.closed){
+      const el = pipWindow.document.getElementById('pipBpmValue');
+      if(el) el.textContent = bpm;
+    }
+  }
+  function updatePipPlayState(){
+    if(pipWindow && !pipWindow.closed){
+      const btn = pipWindow.document.getElementById('pipPlayBtn');
+      if(btn){
+        btn.textContent = isPlaying ? '■ Stop' : '▶ Start';
+        btn.classList.toggle('playing', isPlaying);
+      }
+    }
+  }
+
+  async function openFloatingWindow(){
+    if(!('documentPictureInPicture' in window)){
+      floatStatus.textContent = "Floating windows aren't supported in this browser — try Chrome or Edge on a computer.";
+      return;
+    }
+    if(pipWindow && !pipWindow.closed){
+      pipWindow.focus();
+      return;
+    }
+    const pip = await documentPictureInPicture.requestWindow({ width: 240, height: 230 });
+    pipWindow = pip;
+
+    // Reuse the page's own stylesheet so the mini UI matches (colors,
+    // button styles, CSS variables) instead of rebuilding it from scratch.
+    document.querySelectorAll('style').forEach(styleEl=>{
+      const clone = pip.document.createElement('style');
+      clone.textContent = styleEl.textContent;
+      pip.document.head.appendChild(clone);
+    });
+
+    pip.document.body.style.margin = '0';
+    pip.document.body.style.background = 'var(--bg)';
+    pip.document.body.style.display = 'flex';
+    pip.document.body.style.alignItems = 'center';
+    pip.document.body.style.justifyContent = 'center';
+    pip.document.body.style.minHeight = '100vh';
+
+    const container = pip.document.createElement('div');
+    container.style.width = '100%';
+    container.style.padding = '10px 18px';
+    container.innerHTML = `
+      <div class="bpm-display">
+        <div class="bpm-value" id="pipBpmValue">${bpm}</div>
+        <div class="bpm-label">BPM</div>
+      </div>
+      <div class="bpm-controls">
+        <button class="step-btn" id="pipMinus10">−10</button>
+        <button class="step-btn" id="pipMinus1">−1</button>
+        <button class="step-btn" id="pipPlus1">+1</button>
+        <button class="step-btn" id="pipPlus10">+10</button>
+      </div>
+      <button class="play-btn" id="pipPlayBtn" style="width:100%;margin-top:12px;">${isPlaying ? '■ Stop' : '▶ Start'}</button>
+    `;
+    pip.document.body.appendChild(container);
+    if(isPlaying) pip.document.getElementById('pipPlayBtn').classList.add('playing');
+
+    pip.document.getElementById('pipMinus10').addEventListener('click', ()=> setBpm(bpm-10));
+    pip.document.getElementById('pipMinus1').addEventListener('click', ()=> setBpm(bpm-1));
+    pip.document.getElementById('pipPlus1').addEventListener('click', ()=> setBpm(bpm+1));
+    pip.document.getElementById('pipPlus10').addEventListener('click', ()=> setBpm(bpm+10));
+    pip.document.getElementById('pipPlayBtn').addEventListener('click', ()=>{
+      if(isPlaying) stop(); else start();
+    });
+
+    floatBtn.classList.add('active');
+    floatBtn.title = 'Close floating window';
+    floatStatus.textContent = '';
+
+    pip.addEventListener('pagehide', ()=>{
+      pipWindow = null;
+      floatBtn.classList.remove('active');
+      floatBtn.title = 'Pop out as a floating window (Chrome/Edge desktop)';
+    });
+  }
+
+  floatBtn.addEventListener('click', ()=>{
+    if(pipWindow && !pipWindow.closed){
+      pipWindow.close();
+      pipWindow = null;
+      floatBtn.classList.remove('active');
+      floatBtn.title = 'Pop out as a floating window (Chrome/Edge desktop)';
+    } else {
+      openFloatingWindow();
+    }
+  });
+
+  // The whole point of the floating window is to keep the metronome running
+  // independent of which in-app tab is showing — so don't auto-stop it on
+  // tab switch while it's popped out.
+  TabLifecycle.registerStop('metronome', ()=>{
+    if(isPlaying && !(pipWindow && !pipWindow.closed)) stop();
+  });
+})();
+
+/* =========================================================
+   TUNER
+   ========================================================= */
+(function(){
+  const micBtn = document.getElementById('micBtn');
+  const tunerStatus = document.getElementById('tunerStatus');
+  const noteName = document.getElementById('noteName');
+  const freqLine = document.getElementById('freqLine');
+  const needle = document.getElementById('needle');
+  const stringsEl = document.getElementById('strings');
+
+  const STRINGS = [
+    {name:'E', label:'E2', freq:82.41},
+    {name:'A', label:'A2', freq:110.00},
+    {name:'D', label:'D3', freq:146.83},
+    {name:'G', label:'G3', freq:196.00},
+    {name:'B', label:'B3', freq:246.94},
+    {name:'E', label:'E4', freq:329.63}
+  ];
+
+  STRINGS.forEach((s, idx)=>{
+    const chip = document.createElement('div');
+    chip.className = 'string-chip';
+    chip.dataset.idx = idx;
+    chip.innerHTML = `${s.label}<span class="hz">${s.freq.toFixed(1)} Hz</span>`;
+    stringsEl.appendChild(chip);
+  });
+  const chips = stringsEl.querySelectorAll('.string-chip');
+
+  const NOTE_STRINGS = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+
+  let audioCtx = null;
+  let analyser = null;
+  let preGain = null;
+  let mediaStream = null;
+  let dataArray = null;
+  let rafId = null;
+  let listening = false;
+
+  WakeLockManager.onChange((active, supported)=>{
+    if(!listening) return;
+    if(!supported){
+      tunerStatus.textContent = "Listening — play a string (your browser can't keep the screen on automatically, you may want to disable auto-lock)";
+    } else if(active){
+      tunerStatus.textContent = '📱 Listening — screen kept on';
+    }
+  });
+
+  function freqToNote(freq){
+    const noteNum = 12 * (Math.log2(freq / 440)) + 69; // MIDI note number
+    const rounded = Math.round(noteNum);
+    const cents = Math.floor((noteNum - rounded) * 100);
+    const name = NOTE_STRINGS[(rounded + 1200) % 12];
+    const octave = Math.floor(rounded/12) - 1;
+    return {name, octave, cents, midi: rounded};
+  }
+
+  function noteFreq(midi){
+    return 440 * Math.pow(2, (midi-69)/12);
+  }
+
+  // Autocorrelation pitch detection (ACF2+ style)
+  function autoCorrelate(buf, sampleRate){
+    const SIZE = buf.length;
+    let rms = 0;
+    for(let i=0;i<SIZE;i++){ rms += buf[i]*buf[i]; }
+    rms = Math.sqrt(rms/SIZE);
+    if(rms < 0.003) return -1; // too quiet
+
+    let r1=0, r2=SIZE-1, thresh=0.2;
+    for(let i=0;i<SIZE/2;i++){ if(Math.abs(buf[i])<thresh){ r1=i; break; } }
+    for(let i=1;i<SIZE/2;i++){ if(Math.abs(buf[SIZE-i])<thresh){ r2=SIZE-i; break; } }
+    const trimmed = buf.slice(r1, r2);
+    const newSize = trimmed.length;
+
+    const c = new Array(newSize).fill(0);
+    for(let lag=0; lag<newSize; lag++){
+      for(let i=0; i<newSize-lag; i++){
+        c[lag] += trimmed[i]*trimmed[i+lag];
+      }
+    }
+    let d=0;
+    while(c[d] > c[d+1]) d++;
+    let maxVal=-1, maxPos=-1;
+    for(let i=d; i<newSize; i++){
+      if(c[i] > maxVal){ maxVal = c[i]; maxPos = i; }
+    }
+    let T0 = maxPos;
+    if(T0 <= 0) return -1;
+
+    // Parabolic interpolation
+    const x1 = c[T0-1] || 0, x2 = c[T0], x3 = c[T0+1] || 0;
+    const a = (x1 + x3 - 2*x2)/2;
+    const b = (x3 - x1)/2;
+    if(a) T0 = T0 - b/(2*a);
+
+    return sampleRate / T0;
+  }
+
+  function closestString(freq){
+    let best = null, bestDiff = Infinity;
+    STRINGS.forEach((s, idx)=>{
+      const diff = Math.abs(freq - s.freq);
+      if(diff < bestDiff){ bestDiff = diff; best = idx; }
+    });
+    return best;
+  }
+
+  function updateUI(freq){
+    if(freq < 0){
+      noteName.textContent = '—';
+      freqLine.innerHTML = '&nbsp;';
+      needle.style.left = '50%';
+      needle.style.background = 'var(--good)';
+      chips.forEach(c=>c.classList.remove('active','in-tune'));
+      return;
+    }
+    const note = freqToNote(freq);
+    noteName.textContent = note.name + (note.octave);
+    freqLine.textContent = freq.toFixed(2) + ' Hz  •  ' + (note.cents>0?'+':'') + note.cents + ' cents';
+
+    const clampedCents = Math.max(-50, Math.min(50, note.cents));
+    const pct = 50 + clampedCents; // 0..100
+    needle.style.left = pct + '%';
+
+    const inTune = Math.abs(note.cents) <= 5;
+    needle.style.background = inTune ? 'var(--good)' : (Math.abs(note.cents)<=15 ? 'var(--accent)' : 'var(--danger)');
+
+    const idx = closestString(freq);
+    chips.forEach((c,i)=>{
+      c.classList.toggle('active', i===idx);
+      c.classList.toggle('in-tune', i===idx && inTune);
+    });
+  }
+
+  function detectLoop(){
+    analyser.getFloatTimeDomainData(dataArray);
+    const freq = autoCorrelate(dataArray, audioCtx.sampleRate);
+    if(freq > 0 && freq < 1200){
+      updateUI(freq);
+    } else {
+      updateUI(-1);
+    }
+    rafId = requestAnimationFrame(detectLoop);
+  }
+
+  async function startTuner(){
+    try{
+      tunerStatus.textContent = 'Requesting microphone access...';
+      mediaStream = await getRawMicStream();
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const source = audioCtx.createMediaStreamSource(mediaStream);
+      // Pre-amp gain before analysis: boosts quiet playing so soft picking
+      // still registers. Safe to push above 1.0 here since this only feeds
+      // the analyser (never the speakers), so there's no clipping/feedback risk.
+      preGain = audioCtx.createGain();
+      preGain.gain.value = 6;
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 2048;
+      dataArray = new Float32Array(analyser.fftSize);
+      source.connect(preGain);
+      preGain.connect(analyser);
+
+      listening = true;
+      micBtn.textContent = 'Stop';
+      micBtn.classList.add('listening');
+      tunerStatus.textContent = 'Listening — play a string';
+      WakeLockManager.activate('tuner');
+      detectLoop();
+    } catch(err){
+      tunerStatus.textContent = 'Microphone access denied or unavailable.';
+      console.error(err);
+    }
+  }
+
+  function stopTuner(){
+    listening = false;
+    if(rafId) cancelAnimationFrame(rafId);
+    if(mediaStream) mediaStream.getTracks().forEach(t=>t.stop());
+    if(audioCtx) audioCtx.close();
+    micBtn.textContent = 'Start';
+    micBtn.classList.remove('listening');
+    tunerStatus.textContent = 'Allow microphone access to get started';
+    WakeLockManager.deactivate('tuner');
+    updateUI(-1);
+  }
+
+  micBtn.addEventListener('click', ()=>{
+    if(listening) stopTuner(); else startTuner();
+  });
+
+  // Clicking a string chip plays a reference tone
+  chips.forEach((chip, idx)=>{
+    chip.addEventListener('click', ()=>{
+      const ctx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.frequency.value = STRINGS[idx].freq;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.2);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 1.2);
+      if(!audioCtx) { audioCtx = null; } // don't keep ephemeral ctx as the tuner's ctx
+    });
+  });
+
+  TabLifecycle.registerStop('tuner', ()=>{ if(listening) stopTuner(); });
+  TabLifecycle.registerStart('tuner', ()=>{ if(!listening) startTuner(); });
+})();
+
+/* =========================================================
+   LOOP (simple, replaceable loop — no overdub)
+   ========================================================= */
+(function(){
+  const mainBtn = document.getElementById('loopMainBtn');
+  const pauseBtn = document.getElementById('loopPauseBtn');
+  const clearBtn = document.getElementById('loopClearBtn');
+  const secondaryControls = document.getElementById('loopSecondaryControls');
+  const loopStatus = document.getElementById('loopStatus');
+  const loopWakeNote = document.getElementById('loopWakeNote');
+  const loopVolumeSlider = document.getElementById('loopVolumeSlider');
+  const loopVolumeValue = document.getElementById('loopVolumeValue');
+  const openFileBtn = document.getElementById('loopOpenFileBtn');
+  const fileInput = document.getElementById('loopFileInput');
+  const downloadBtn = document.getElementById('loopDownloadBtn');
+  const trimToggleBtn = document.getElementById('loopTrimToggleBtn');
+  const trimPanel = document.getElementById('loopTrimPanel');
+  const waveformWrap = document.getElementById('waveformWrap');
+  const trimCanvas = document.getElementById('trimCanvas');
+  const trimRegion = document.getElementById('trimRegion');
+  const trimPlayhead = document.getElementById('trimPlayhead');
+  const trimHandleStart = document.getElementById('trimHandleStart');
+  const trimHandleEnd = document.getElementById('trimHandleEnd');
+  const trimStartLabel = document.getElementById('trimStartLabel');
+  const trimEndLabel = document.getElementById('trimEndLabel');
+  const trimPreviewBtn = document.getElementById('trimPreviewBtn');
+  const trimApplyBtn = document.getElementById('trimApplyBtn');
+  const trimCancelBtn = document.getElementById('trimCancelBtn');
+
+  const MAX_RECORD_SECONDS = 60;
+
+  // Raw PCM capture via ScriptProcessorNode — deliberately NOT using
+  // MediaRecorder, whose Opus/WebM encoder pads the start with a few silent
+  // priming samples, which creates an audible gap/click every time the loop
+  // restarts and defeats the point of a seamless looper.
+  //
+  // ScriptProcessorNode is deprecated in favour of AudioWorklet, but an
+  // AudioWorklet loaded from a Blob URL is known to fail on some WebKit/iOS
+  // Safari versions (addModule() rejects), which is what was breaking this
+  // for phone users. ScriptProcessorNode needs no external module file and
+  // works reliably everywhere Web Audio is supported, so it's the safer
+  // choice for a single-file app used across unknown devices.
+  let audioCtx = null;
+  let micStream = null;
+  let sourceNode = null;
+  let preGain = null;
+  let processorNode = null;
+  let silentGain = null;
+  let chunks = [];
+  let recordedBuffer = null;
+  let loopSource = null;
+  let loopGain = null;
+  let recording = false;
+  let paused = false;
+  let loopVolumeMultiplier = 1.0;
+  let recordStartTime = 0;
+  let timerId = null;
+  let maxLenTimeoutId = null;
+  let previewSourceNode = null;
+
+  loopVolumeSlider.addEventListener('input', e=>{
+    loopVolumeMultiplier = e.target.value / 100;
+    loopVolumeValue.textContent = e.target.value + '%';
+    if(loopGain && !paused) loopGain.gain.setValueAtTime(loopVolumeMultiplier, audioCtx.currentTime);
+  });
+
+  function formatTime(sec){
+    const m = Math.floor(sec/60);
+    const s = Math.floor(sec%60);
+    return m + ':' + String(s).padStart(2,'0');
+  }
+
+  function startTimerDisplay(){
+    timerId = setInterval(()=>{
+      const elapsed = (performance.now() - recordStartTime)/1000;
+      loopStatus.textContent = '🔴 Recording… ' + formatTime(elapsed);
+    }, 100);
+  }
+  function stopTimerDisplay(){
+    if(timerId){ clearInterval(timerId); timerId = null; }
+  }
+
+  async function startRecording(){
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state === 'suspended') await audioCtx.resume();
+
+    if(!audioCtx.createScriptProcessor){
+      loopStatus.textContent = "Your browser doesn't support live audio recording.";
+      return;
+    }
+
+    try{
+      micStream = await getRawMicStream();
+    }catch(err){
+      loopStatus.textContent = 'Microphone access denied or unavailable (' + (err.name || err.message || err) + ').';
+      console.error(err);
+      return;
+    }
+
+    sourceNode = audioCtx.createMediaStreamSource(micStream);
+
+    // Fixed boost only — no compressor/limiter in the recording path.
+    // Even a "brickwall" limiter still reacts to the performance's own
+    // dynamics (louder pick attacks vs. sustain), which reads as audible
+    // pumping (quiet at the start, louder after) — exactly what was
+    // reported, and it showed up on a MacBook too, so it wasn't just
+    // phone-side hardware AGC. A flat gain has no time-based behavior at
+    // all, so the level stays consistent throughout. Trade-off: a very
+    // loud strum could clip; if that turns out to be a problem, lower this
+    // value rather than reintroducing a compressor.
+    preGain = audioCtx.createGain();
+    preGain.gain.value = 2.5;
+
+    processorNode = audioCtx.createScriptProcessor(4096, 1, 1);
+    chunks = [];
+    processorNode.onaudioprocess = (e)=>{
+      if(recording) chunks.push(e.inputBuffer.getChannelData(0).slice());
+    };
+
+    // The processor needs a connected output to keep being called reliably
+    // in every browser, but we route it through a silent gain so the user
+    // doesn't hear their own mic monitored live through the speakers.
+    silentGain = audioCtx.createGain();
+    silentGain.gain.value = 0;
+    sourceNode.connect(preGain);
+    preGain.connect(processorNode);
+    processorNode.connect(silentGain);
+    silentGain.connect(audioCtx.destination);
+
+    recording = true;
+    recordStartTime = performance.now();
+    mainBtn.textContent = '⏹ Stop';
+    mainBtn.classList.add('listening');
+    secondaryControls.style.display = 'none';
+    startTimerDisplay();
+    WakeLockManager.activate('loop');
+
+    maxLenTimeoutId = setTimeout(()=>{
+      if(recording) stopRecording();
+    }, MAX_RECORD_SECONDS * 1000);
+  }
+
+  function stopRecording(){
+    if(!recording) return;
+    recording = false;
+    clearTimeout(maxLenTimeoutId);
+    stopTimerDisplay();
+
+    sourceNode.disconnect();
+    preGain.disconnect();
+    processorNode.disconnect();
+    processorNode.onaudioprocess = null;
+    silentGain.disconnect();
+    micStream.getTracks().forEach(t=>t.stop());
+
+    const total = chunks.reduce((sum,c)=> sum + c.length, 0);
+    if(total === 0){
+      loopStatus.textContent = "Nothing was captured — try again closer to the microphone.";
+      mainBtn.textContent = '🔴 Record';
+      mainBtn.classList.remove('listening');
+      chunks = [];
+      return;
+    }
+    recordedBuffer = audioCtx.createBuffer(1, total, audioCtx.sampleRate);
+    const out = recordedBuffer.getChannelData(0);
+    let offset = 0;
+    for(const c of chunks){ out.set(c, offset); offset += c.length; }
+    chunks = [];
+
+    // A manual stop (guitar in your hands) rarely lands exactly on the
+    // right loop point — so we go straight into the trim view instead of
+    // starting the raw loop as-is.
+    mainBtn.textContent = '🔴 Re-record';
+    mainBtn.classList.remove('listening');
+    secondaryControls.style.display = 'block';
+    loopStatus.textContent = '✂️ Adjust the start/end if needed, then confirm.';
+    enterTrimMode(true);
+  }
+
+  function startLoopPlayback(){
+    if(!loopGain){
+      loopGain = audioCtx.createGain();
+      loopGain.connect(audioCtx.destination);
+    }
+    loopGain.gain.setValueAtTime(loopVolumeMultiplier, audioCtx.currentTime);
+    loopSource = audioCtx.createBufferSource();
+    loopSource.buffer = recordedBuffer;
+    loopSource.loop = true;
+    loopSource.connect(loopGain);
+    loopSource.start(0);
+
+    paused = false;
+    mainBtn.textContent = '🔴 Re-record';
+    mainBtn.classList.remove('listening');
+    secondaryControls.style.display = 'block';
+    pauseBtn.textContent = '⏸ Pause';
+    loopStatus.textContent = '🔁 Loop playing — ' + formatTime(recordedBuffer.duration);
+    WakeLockManager.activate('loop');
+  }
+
+  function togglePause(){
+    if(!loopGain) return;
+    paused = !paused;
+    loopGain.gain.setValueAtTime(paused ? 0 : loopVolumeMultiplier, audioCtx.currentTime);
+    pauseBtn.textContent = paused ? '▶ Resume' : '⏸ Pause';
+    loopStatus.textContent = (paused ? '⏸ Paused — ' : '🔁 Loop playing — ') + formatTime(recordedBuffer.duration);
+    if(paused) WakeLockManager.deactivate('loop'); else WakeLockManager.activate('loop');
+  }
+
+  function clearLoop(){
+    exitTrimMode(false);
+    if(loopSource){ try{ loopSource.stop(); }catch(e){} loopSource = null; }
+    recordedBuffer = null;
+    paused = false;
+    mainBtn.textContent = '🔴 Record';
+    mainBtn.classList.remove('listening');
+    secondaryControls.style.display = 'none';
+    loopStatus.textContent = 'Tap to record your loop';
+    WakeLockManager.deactivate('loop');
+  }
+
+  mainBtn.addEventListener('click', ()=>{
+    if(recording){ stopRecording(); }
+    else if(recordedBuffer){ clearLoop(); startRecording(); }
+    else { startRecording(); }
+  });
+  pauseBtn.addEventListener('click', togglePause);
+  clearBtn.addEventListener('click', clearLoop);
+
+  /* ---- Manual trim (start/end), with waveform and drag handles ---- */
+  let trimStartPct = 0;
+  let trimEndPct = 100;
+  let isPreviewPlaying = false;
+  let draggingHandle = null;
+  let trimContext = 'edit'; // 'fresh' (right after recording) or 'edit' (loop already in place)
+  let previewPlayheadPct = 0;
+
+  function updateTrimLabels(){
+    const dur = recordedBuffer.duration;
+    trimStartLabel.textContent = formatTime((trimStartPct/100) * dur);
+    trimEndLabel.textContent = formatTime((trimEndPct/100) * dur);
+  }
+
+  function updateHandlePositions(){
+    const w = waveformWrap.clientWidth;
+    trimHandleStart.style.left = (trimStartPct/100 * w) + 'px';
+    trimHandleEnd.style.left = (trimEndPct/100 * w) + 'px';
+    trimRegion.style.left = (trimStartPct/100 * w) + 'px';
+    trimRegion.style.width = ((trimEndPct - trimStartPct)/100 * w) + 'px';
+  }
+
+  function updatePlayheadPosition(){
+    const w = waveformWrap.clientWidth;
+    trimPlayhead.style.left = (previewPlayheadPct/100 * w) + 'px';
+  }
+
+  function drawWaveform(){
+    const dpr = window.devicePixelRatio || 1;
+    const w = trimCanvas.clientWidth;
+    const h = trimCanvas.clientHeight;
+    trimCanvas.width = w * dpr;
+    trimCanvas.height = h * dpr;
+    const g = trimCanvas.getContext('2d');
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, w, h);
+    const data = recordedBuffer.getChannelData(0);
+    const step = Math.max(1, Math.ceil(data.length / w));
+    const mid = h / 2;
+
+    // Auto-scale to the recording's actual peak rather than the theoretical
+    // max amplitude (1.0) — otherwise a not-very-loud recording renders
+    // almost flat. Display-only, doesn't touch the actual audio.
+    let peak = 0;
+    for(let i=0; i<data.length; i++){
+      const v = Math.abs(data[i]);
+      if(v > peak) peak = v;
+    }
+    if(peak < 0.02) peak = 0.02; // avoid a wild zoom on near-total silence
+    const visualGain = 0.95 / peak;
+
+    g.fillStyle = '#5bc0a3';
+    for(let x=0; x<w; x++){
+      const start = x * step;
+      const end = Math.min(data.length, start + step);
+      let min = 1, max = -1;
+      for(let i=start; i<end; i++){
+        const v = data[i];
+        if(v < min) min = v;
+        if(v > max) max = v;
+      }
+      if(min > max){ min = 0; max = 0; }
+      const yTop = Math.max(0, mid - max * mid * visualGain);
+      const yBottom = Math.min(h, mid - min * mid * visualGain);
+      g.fillRect(x, yTop, 1, Math.max(1, yBottom - yTop));
+    }
+  }
+
+  function enterTrimMode(isFresh){
+    if(!recordedBuffer) return;
+    trimContext = isFresh ? 'fresh' : 'edit';
+    trimCancelBtn.textContent = isFresh ? '↩ Keep as-is' : '✖ Cancel';
+    if(loopGain) loopGain.gain.setValueAtTime(0, audioCtx.currentTime); // mute while editing
+    trimStartPct = 0;
+    trimEndPct = 100;
+    previewPlayheadPct = 0;
+    trimPanel.style.display = 'block';
+    // The canvas only has a real width once it's visible — wait a frame.
+    requestAnimationFrame(()=>{
+      drawWaveform();
+      updateHandlePositions();
+      updatePlayheadPosition();
+      updateTrimLabels();
+    });
+  }
+
+  function exitTrimMode(restoreVolume){
+    trimPanel.style.display = 'none';
+    stopPreview();
+    if(restoreVolume && loopGain && !paused){
+      loopGain.gain.setValueAtTime(loopVolumeMultiplier, audioCtx.currentTime);
+    }
+  }
+
+  function getTrimSampleRange(){
+    const dur = recordedBuffer.duration;
+    const sr = recordedBuffer.sampleRate;
+    const startSample = Math.floor((trimStartPct/100) * dur * sr);
+    const endSample = Math.min(recordedBuffer.length, Math.floor((trimEndPct/100) * dur * sr));
+    return {startSample, endSample};
+  }
+
+  let previewStartCtxTime = 0;
+  let previewOffsetSec = 0;
+  let previewBufferDuration = 0;
+  let playheadAnimId = null;
+
+  function animatePlayhead(){
+    if(!isPreviewPlaying) return;
+    const elapsed = audioCtx.currentTime - previewStartCtxTime;
+    const posInBuffer = ((previewOffsetSec + elapsed) % previewBufferDuration + previewBufferDuration) % previewBufferDuration;
+    const pctWithinSelection = (posInBuffer / previewBufferDuration) * 100;
+    const displayPct = trimStartPct + (pctWithinSelection/100) * (trimEndPct - trimStartPct);
+    trimPlayhead.style.left = (displayPct/100 * waveformWrap.clientWidth) + 'px';
+    playheadAnimId = requestAnimationFrame(animatePlayhead);
+  }
+
+  function stopPreview(){
+    if(previewSourceNode){ try{ previewSourceNode.stop(); }catch(e){} previewSourceNode = null; }
+    isPreviewPlaying = false;
+    trimPreviewBtn.textContent = '▶ Preview (loop)';
+    if(playheadAnimId){ cancelAnimationFrame(playheadAnimId); playheadAnimId = null; }
+    updatePlayheadPosition(); // snaps the marker back to the clicked point (start position for the next preview)
+  }
+
+  function previewTrim(){
+    if(isPreviewPlaying){ stopPreview(); return; }
+    const {startSample, endSample} = getTrimSampleRange();
+    if(endSample <= startSample) return;
+    const len = endSample - startSample;
+    const buf = audioCtx.createBuffer(1, len, recordedBuffer.sampleRate);
+    buf.getChannelData(0).set(recordedBuffer.getChannelData(0).subarray(startSample, endSample));
+    previewSourceNode = audioCtx.createBufferSource();
+    previewSourceNode.buffer = buf;
+    previewSourceNode.loop = true; // so we can judge whether the loop point is clean
+    const previewGain = audioCtx.createGain();
+    previewGain.gain.value = loopVolumeMultiplier;
+    previewSourceNode.connect(previewGain);
+    previewGain.connect(audioCtx.destination);
+    // Starts from the playhead rather than always from the start of the
+    // selection — handy for jumping straight to a specific spot without
+    // listening through everything each time.
+    const offsetPct = Math.max(0, previewPlayheadPct - trimStartPct);
+    const offsetSec = Math.min(buf.duration - 0.001, (offsetPct/100) * recordedBuffer.duration);
+    previewSourceNode.start(0, Math.max(0, offsetSec));
+    isPreviewPlaying = true;
+    trimPreviewBtn.textContent = '⏹ Stop preview';
+
+    // Tracks playback in real time by animating the white marker along the
+    // waveform, synced to the audio context's clock.
+    previewStartCtxTime = audioCtx.currentTime;
+    previewOffsetSec = offsetSec;
+    previewBufferDuration = buf.duration;
+    playheadAnimId = requestAnimationFrame(animatePlayhead);
+  }
+
+  function applyTrim(){
+    const {startSample, endSample} = getTrimSampleRange();
+    if(endSample - startSample < recordedBuffer.sampleRate * 0.05){
+      loopStatus.textContent = 'Selection too short — widen the area to keep.';
+      return;
+    }
+    const newBuffer = audioCtx.createBuffer(1, endSample - startSample, recordedBuffer.sampleRate);
+    newBuffer.getChannelData(0).set(recordedBuffer.getChannelData(0).subarray(startSample, endSample));
+    if(loopSource){ try{ loopSource.stop(); }catch(e){} loopSource = null; }
+    recordedBuffer = newBuffer;
+    exitTrimMode(false);
+    startLoopPlayback();
+  }
+
+  function pctFromClientX(clientX){
+    const rect = waveformWrap.getBoundingClientRect();
+    return Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
+  }
+
+  function makeHandleDraggable(handle, isStart){
+    handle.addEventListener('pointerdown', e=>{
+      draggingHandle = isStart ? 'start' : 'end';
+      handle.setPointerCapture(e.pointerId);
+      stopPreview();
+      e.preventDefault();
+    });
+    handle.addEventListener('pointermove', e=>{
+      if(!draggingHandle) return;
+      const pct = pctFromClientX(e.clientX);
+      if(isStart) trimStartPct = Math.min(pct, trimEndPct - 0.5);
+      else trimEndPct = Math.max(pct, trimStartPct + 0.5);
+      previewPlayheadPct = Math.max(trimStartPct, Math.min(trimEndPct, previewPlayheadPct));
+      updateHandlePositions();
+      updatePlayheadPosition();
+      updateTrimLabels();
+    });
+    const release = ()=>{ draggingHandle = null; };
+    handle.addEventListener('pointerup', release);
+    handle.addEventListener('pointercancel', release);
+  }
+  makeHandleDraggable(trimHandleStart, true);
+  makeHandleDraggable(trimHandleEnd, false);
+
+  // Tapping/clicking the waveform anywhere other than a handle moves the
+  // playback marker — handy for starting the preview at a precise spot.
+  waveformWrap.addEventListener('pointerdown', e=>{
+    if(e.target === trimHandleStart || e.target === trimHandleEnd) return;
+    const pct = pctFromClientX(e.clientX);
+    previewPlayheadPct = Math.max(trimStartPct, Math.min(trimEndPct, pct));
+    updatePlayheadPosition();
+    stopPreview();
+  });
+
+  trimToggleBtn.addEventListener('click', ()=> enterTrimMode(false));
+  trimCancelBtn.addEventListener('click', ()=>{
+    if(trimContext === 'fresh'){
+      // No previous loop to restore here — keep the full recording as-is
+      // and start the loop with it.
+      trimStartPct = 0;
+      trimEndPct = 100;
+      exitTrimMode(false);
+      startLoopPlayback();
+    } else {
+      exitTrimMode(true);
+    }
+  });
+  trimPreviewBtn.addEventListener('click', previewTrim);
+  trimApplyBtn.addEventListener('click', applyTrim);
+  window.addEventListener('resize', ()=>{
+    if(trimPanel.style.display === 'block'){ drawWaveform(); updateHandlePositions(); updatePlayheadPosition(); }
+  });
+
+  /* ---- WAV export ---- */
+  function bufferToWavBlob(buffer){
+    const data = buffer.getChannelData(0);
+    const sampleRate = buffer.sampleRate;
+    const bytesPerSample = 2;
+    const dataSize = data.length * bytesPerSample;
+    const arrayBuffer = new ArrayBuffer(44 + dataSize);
+    const view = new DataView(arrayBuffer);
+    const writeString = (offset, str)=>{ for(let i=0;i<str.length;i++) view.setUint8(offset+i, str.charCodeAt(i)); };
+
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + dataSize, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);        // PCM chunk size
+    view.setUint16(20, 1, true);         // format = PCM
+    view.setUint16(22, 1, true);         // channels = mono
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * bytesPerSample, true); // byte rate
+    view.setUint16(32, bytesPerSample, true);              // block align
+    view.setUint16(34, 16, true);        // bits per sample
+    writeString(36, 'data');
+    view.setUint32(40, dataSize, true);
+
+    let offset = 44;
+    for(let i=0;i<data.length;i++){
+      const s = Math.max(-1, Math.min(1, data[i]));
+      view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      offset += 2;
+    }
+    return new Blob([view], {type:'audio/wav'});
+  }
+
+  function downloadLoop(){
+    if(!recordedBuffer) return;
+    const blob = bufferToWavBlob(recordedBuffer);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'guitar-loop-' + new Date().toISOString().slice(0,19).replace(/[:T]/g,'-') + '.wav';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(()=> URL.revokeObjectURL(url), 3000);
+  }
+  downloadBtn.addEventListener('click', downloadLoop);
+
+  /* ---- Import an existing audio file ---- */
+  openFileBtn.addEventListener('click', async ()=>{
+    // Create/resume the context here, inside the direct click gesture —
+    // needed on iOS Safari, which can refuse to start audio if we wait for
+    // the file picker's 'change' event (async, not always recognized as a
+    // "fresh" user gesture).
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state === 'suspended') await audioCtx.resume();
+    fileInput.click();
+  });
+
+  fileInput.addEventListener('change', async (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    try{
+      const arrayBuffer = await file.arrayBuffer();
+      const decoded = await audioCtx.decodeAudioData(arrayBuffer);
+      let mono = decoded;
+      if(decoded.numberOfChannels > 1){
+        mono = audioCtx.createBuffer(1, decoded.length, decoded.sampleRate);
+        const out = mono.getChannelData(0);
+        const chans = [];
+        for(let c=0;c<decoded.numberOfChannels;c++) chans.push(decoded.getChannelData(c));
+        for(let i=0;i<decoded.length;i++){
+          let sum = 0;
+          for(let c=0;c<chans.length;c++) sum += chans[c][i];
+          out[i] = sum / chans.length;
+        }
+      }
+      if(loopSource){ try{ loopSource.stop(); }catch(err){} loopSource = null; }
+      recordedBuffer = mono;
+      startLoopPlayback();
+    }catch(err){
+      loopStatus.textContent = 'Could not read this audio file (' + (err.name || err.message || err) + ').';
+      console.error(err);
+    }
+    fileInput.value = '';
+  });
+
+  WakeLockManager.onChange((active, supported)=>{
+    if(!recording && (!recordedBuffer || paused)) return;
+    if(!supported){
+      loopWakeNote.textContent = "Your browser can't keep the screen on automatically — you may want to disable auto-lock.";
+    } else if(active){
+      loopWakeNote.textContent = '📱 Screen kept on';
+    }
+  });
+
+  TabLifecycle.registerStop('loop', ()=>{
+    if(recording){ stopRecording(); }
+    if(isPreviewPlaying){ stopPreview(); }
+    if(loopSource && !paused){ togglePause(); }
+  });
+})();
+
+/* =========================================================
+   TABS
+   ========================================================= */
+(function(){
+  const tabBtns = document.querySelectorAll('.tab-btn');
+  const panels = {
+    tuner: document.getElementById('panel-tuner'),
+    metronome: document.getElementById('panel-metronome'),
+    loop: document.getElementById('panel-loop')
+  };
+  tabBtns.forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      if(btn.classList.contains('active')) return;
+      const currentActiveBtn = document.querySelector('.tab-btn.active');
+      if(currentActiveBtn){ TabLifecycle.stop(currentActiveBtn.dataset.tab); }
+      tabBtns.forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      Object.values(panels).forEach(p=>p.classList.remove('active'));
+      panels[btn.dataset.tab].classList.add('active');
+      TabLifecycle.start(btn.dataset.tab);
+    });
+  });
+})();
+</script>
+</body>
+</html>
