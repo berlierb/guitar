@@ -400,6 +400,17 @@
     box-shadow:0 0 5px rgba(255,255,255,.7);
     pointer-events:none;
   }
+  /* The loop player (waveform) is shared between playback and trim modes:
+     .trim-only / .play-only elements are shown depending on #loopPlayer.trimming */
+  #loopPlayer:not(.trimming) .trim-only{display:none !important;}
+  #loopPlayer.trimming .play-only{display:none !important;}
+  .speed-ticks{
+    display:flex;
+    justify-content:space-between;
+    color:var(--muted);
+    font-size:.72rem;
+    padding:0 4px;
+  }
   .preset-btn{
     padding:8px 14px;
     border-radius:20px;
@@ -577,6 +588,38 @@
     <button class="preset-btn" id="loopOpenFileBtn" style="display:block;margin:0 auto 14px;">📂 Open an audio file</button>
     <input type="file" id="loopFileInput" accept="audio/*" style="display:none;">
 
+    <div class="volume-box" id="loopPlayer" style="display:none;margin:0 0 14px;">
+      <div class="trim-times trim-only">
+        <span id="trimStartLabel">0:00</span>
+        <span class="trim-sep">→</span>
+        <span id="trimEndLabel">0:00</span>
+      </div>
+      <div class="trim-times play-only">
+        <span id="playPosLabel">0:00.0</span>
+        <span class="trim-sep">/</span>
+        <span id="playDurLabel">0:00.0</span>
+      </div>
+      <div class="waveform-wrap" id="waveformWrap">
+        <canvas id="trimCanvas"></canvas>
+        <div class="trim-region trim-only" id="trimRegion"></div>
+        <div class="trim-playhead" id="trimPlayhead"></div>
+        <div class="trim-handle trim-only" id="trimHandleStart"></div>
+        <div class="trim-handle trim-only" id="trimHandleEnd"></div>
+      </div>
+      <div class="tuner-status trim-only" style="margin:6px 0 0;font-size:.72rem;">Tap the waveform to start the preview from that point</div>
+      <div class="tuner-status play-only" style="margin:6px 0 0;font-size:.72rem;">Tap the waveform to jump to that point</div>
+      <div class="play-only" style="margin-top:14px;">
+        <label>⏱ Speed <span id="speedValue">1×</span></label>
+        <input type="range" id="speedSlider" min="0" max="4" step="1" value="2">
+        <div class="speed-ticks"><span>0.5</span><span>0.75</span><span>1</span><span>1.25</span><span>1.5</span></div>
+      </div>
+      <div class="main-controls trim-only" style="margin-top:14px;">
+        <button class="tap-btn" id="trimPreviewBtn">▶ Preview (loop)</button>
+        <button class="tap-btn" id="trimApplyBtn">✅ Apply</button>
+        <button class="tap-btn" id="trimCancelBtn">✖ Cancel</button>
+      </div>
+    </div>
+
     <div id="loopSecondaryControls" style="display:none;">
       <div class="main-controls">
         <button class="tap-btn" id="loopPauseBtn">⏸ Pause</button>
@@ -585,27 +628,6 @@
       <div class="main-controls" style="margin-top:8px;">
         <button class="tap-btn" id="loopTrimToggleBtn">✂️ Trim</button>
         <button class="tap-btn" id="loopDownloadBtn">💾 Download</button>
-      </div>
-    </div>
-
-    <div class="volume-box" id="loopTrimPanel" style="display:none;">
-      <div class="trim-times">
-        <span id="trimStartLabel">0:00</span>
-        <span class="trim-sep">→</span>
-        <span id="trimEndLabel">0:00</span>
-      </div>
-      <div class="waveform-wrap" id="waveformWrap">
-        <canvas id="trimCanvas"></canvas>
-        <div class="trim-region" id="trimRegion"></div>
-        <div class="trim-playhead" id="trimPlayhead"></div>
-        <div class="trim-handle" id="trimHandleStart"></div>
-        <div class="trim-handle" id="trimHandleEnd"></div>
-      </div>
-      <div class="tuner-status" style="margin:6px 0 0;font-size:.72rem;">Tap the waveform to start the preview from that point</div>
-      <div class="main-controls" style="margin-top:14px;">
-        <button class="tap-btn" id="trimPreviewBtn">▶ Preview (loop)</button>
-        <button class="tap-btn" id="trimApplyBtn">✅ Apply</button>
-        <button class="tap-btn" id="trimCancelBtn">✖ Cancel</button>
       </div>
     </div>
 
@@ -688,11 +710,15 @@ const WakeLockManager = (function(){
 const TabLifecycle = (function(){
   const stoppers = {};
   const starters = {};
+  const togglers = {};
   function registerStop(tab, fn){ stoppers[tab] = fn; }
   function registerStart(tab, fn){ starters[tab] = fn; }
+  // "Main action" of a tab (play/pause), triggered by the space bar
+  function registerToggle(tab, fn){ togglers[tab] = fn; }
   function stop(tab){ if(stoppers[tab]) stoppers[tab](); }
   function start(tab){ if(starters[tab]) starters[tab](); }
-  return { registerStop, registerStart, stop, start };
+  function toggle(tab){ if(togglers[tab]) togglers[tab](); }
+  return { registerStop, registerStart, registerToggle, stop, start, toggle };
 })();
 
 /* =========================================================
@@ -1107,6 +1133,9 @@ async function getRawMicStream(){
   // The whole point of the floating window is to keep the metronome running
   // independent of which in-app tab is showing — so don't auto-stop it on
   // tab switch while it's popped out.
+  TabLifecycle.registerToggle('metronome', ()=>{
+    if(isPlaying) stop(); else start();
+  });
   TabLifecycle.registerStop('metronome', ()=>{
     if(isPlaying && !(pipWindow && !pipWindow.closed)) stop();
   });
@@ -1341,7 +1370,11 @@ async function getRawMicStream(){
   const fileInput = document.getElementById('loopFileInput');
   const downloadBtn = document.getElementById('loopDownloadBtn');
   const trimToggleBtn = document.getElementById('loopTrimToggleBtn');
-  const trimPanel = document.getElementById('loopTrimPanel');
+  const player = document.getElementById('loopPlayer');
+  const playPosLabel = document.getElementById('playPosLabel');
+  const playDurLabel = document.getElementById('playDurLabel');
+  const speedSlider = document.getElementById('speedSlider');
+  const speedValue = document.getElementById('speedValue');
   const waveformWrap = document.getElementById('waveformWrap');
   const trimCanvas = document.getElementById('trimCanvas');
   const trimRegion = document.getElementById('trimRegion');
@@ -1385,6 +1418,26 @@ async function getRawMicStream(){
   let maxLenTimeoutId = null;
   let previewSourceNode = null;
 
+  // Playback position bookkeeping: an AudioBufferSourceNode can't be paused or
+  // queried, so we remember where in the buffer we were (posBase) at a given
+  // audio-clock time (tBase) and extrapolate with the current playback rate.
+  //
+  // Speed changes keep the pitch: instead of a plain playbackRate, we render a
+  // time-stretched copy of the loop (WSOLA, see timeStretch) and play that one
+  // at normal rate. playRate is then the *effective* ratio between the
+  // original and the played buffer (1 = original, 0.5 = twice as long, ...),
+  // and posBase/currentPos() stay expressed in the ORIGINAL loop's timeline.
+  const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5];
+  let playRate = 1;
+  let playBuffer = null;           // buffer actually played (original or stretched)
+  const stretchCache = new Map();  // speed -> stretched AudioBuffer for the current loop
+  let stretchToken = 0;            // invalidates in-flight stretch jobs
+  let posBase = 0;
+  let tBase = 0;
+  let trimming = false;
+  let wasPlayingBeforeTrim = false;
+  let playAnimId = null;
+
   loopVolumeSlider.addEventListener('input', e=>{
     loopVolumeMultiplier = e.target.value / 100;
     loopVolumeValue.textContent = e.target.value + '%';
@@ -1395,6 +1448,11 @@ async function getRawMicStream(){
     const m = Math.floor(sec/60);
     const s = Math.floor(sec%60);
     return m + ':' + String(s).padStart(2,'0');
+  }
+  function formatTimeTenths(sec){
+    const m = Math.floor(sec/60);
+    const s = sec - m*60;
+    return m + ':' + (s < 10 ? '0' : '') + s.toFixed(1);
   }
 
   function startTimerDisplay(){
@@ -1504,41 +1562,120 @@ async function getRawMicStream(){
     enterTrimMode(true);
   }
 
-  function startLoopPlayback(){
+  function currentPos(){
+    if(!recordedBuffer) return 0;
+    if(!loopSource) return posBase;
+    const dur = recordedBuffer.duration;
+    const p = posBase + (audioCtx.currentTime - tBase) * playRate;
+    return ((p % dur) + dur) % dur;
+  }
+
+  function stopSource(){
+    if(!loopSource) return;
+    posBase = currentPos();
+    try{ loopSource.stop(); }catch(e){}
+    loopSource.disconnect();
+    loopSource = null;
+  }
+
+  function startSource(offset){
     if(!loopGain){
       loopGain = audioCtx.createGain();
       loopGain.connect(audioCtx.destination);
     }
     loopGain.gain.setValueAtTime(loopVolumeMultiplier, audioCtx.currentTime);
+    stopSource();
+    posBase = Math.min(Math.max(0, offset), recordedBuffer.duration - 0.001);
+    tBase = audioCtx.currentTime;
     loopSource = audioCtx.createBufferSource();
-    loopSource.buffer = recordedBuffer;
+    loopSource.buffer = playBuffer;
     loopSource.loop = true;
     loopSource.connect(loopGain);
-    loopSource.start(0);
+    loopSource.start(0, posBase / playRate);
+    startPlayAnim();
+  }
+
+  function renderPlayhead(){
+    if(!recordedBuffer || trimming) return;
+    const pos = currentPos();
+    trimPlayhead.style.left = (pos / recordedBuffer.duration * waveformWrap.clientWidth) + 'px';
+    playPosLabel.textContent = formatTimeTenths(pos / playRate);
+  }
+  function playAnimFrame(){
+    if(!loopSource || trimming){ playAnimId = null; return; }
+    renderPlayhead();
+    playAnimId = requestAnimationFrame(playAnimFrame);
+  }
+  function startPlayAnim(){ if(!playAnimId) playAnimId = requestAnimationFrame(playAnimFrame); }
+  function stopPlayAnim(){ if(playAnimId){ cancelAnimationFrame(playAnimId); playAnimId = null; } }
+
+  // Shows the shared waveform player, either in playback or trim mode.
+  function showPlayer(trim){
+    player.style.display = 'block';
+    player.classList.toggle('trimming', trim);
+    // The canvas only has a real width once it's visible — wait a frame.
+    requestAnimationFrame(()=>{
+      if(!recordedBuffer) return;
+      drawWaveform();
+      updateHandlePositions();
+      updateTrimLabels();
+      playDurLabel.textContent = formatTimeTenths((playBuffer || recordedBuffer).duration);
+      if(trim) updatePlayheadPosition(); else renderPlayhead();
+    });
+  }
+
+  function refreshLoopStatus(){
+    loopStatus.textContent = (paused ? '⏸ Paused — ' : '🔁 Loop playing — ') + formatTime(playBuffer.duration);
+  }
+
+  function startLoopPlayback(){
+    exitTrimState();
+    // A new/changed loop always starts again at normal speed
+    stretchToken++;
+    stretchCache.clear();
+    playBuffer = recordedBuffer;
+    playRate = 1;
+    speedSlider.value = 2;
+    speedValue.textContent = '1×';
+    startSource(0);
 
     paused = false;
     mainBtn.textContent = '🔴 Re-record';
     mainBtn.classList.remove('listening');
     secondaryControls.style.display = 'block';
     pauseBtn.textContent = '⏸ Pause';
-    loopStatus.textContent = '🔁 Loop playing — ' + formatTime(recordedBuffer.duration);
+    refreshLoopStatus();
+    showPlayer(false);
     WakeLockManager.activate('loop');
   }
 
   function togglePause(){
-    if(!loopGain) return;
+    if(!recordedBuffer || trimming) return;
     paused = !paused;
-    loopGain.gain.setValueAtTime(paused ? 0 : loopVolumeMultiplier, audioCtx.currentTime);
+    if(paused){
+      stopSource();
+      stopPlayAnim();
+      renderPlayhead();
+      WakeLockManager.deactivate('loop');
+    } else {
+      startSource(posBase);
+      WakeLockManager.activate('loop');
+    }
     pauseBtn.textContent = paused ? '▶ Resume' : '⏸ Pause';
-    loopStatus.textContent = (paused ? '⏸ Paused — ' : '🔁 Loop playing — ') + formatTime(recordedBuffer.duration);
-    if(paused) WakeLockManager.deactivate('loop'); else WakeLockManager.activate('loop');
+    refreshLoopStatus();
   }
 
   function clearLoop(){
     exitTrimMode(false);
-    if(loopSource){ try{ loopSource.stop(); }catch(e){} loopSource = null; }
+    stopSource();
+    stopPlayAnim();
     recordedBuffer = null;
+    playBuffer = null;
+    stretchToken++;
+    stretchCache.clear();
+    posBase = 0;
     paused = false;
+    player.style.display = 'none';
     mainBtn.textContent = '🔴 Record';
     mainBtn.classList.remove('listening');
     secondaryControls.style.display = 'none';
@@ -1546,9 +1683,115 @@ async function getRawMicStream(){
     WakeLockManager.deactivate('loop');
   }
 
+  /* ---- Time stretch (pitch-preserving) ----
+     WSOLA: the loop is cut into overlapping Hann-windowed frames which are
+     re-laid at a different spacing; each frame's start is nudged (±10 ms) to
+     the spot that best continues the previous frame, so waveforms stay in
+     phase and the pitch doesn't move. The source is treated as circular and
+     the output is overlap-added circularly, so the loop point stays seamless.
+     Returns a Float32Array of length ~ x.length / rate, or null if cancelled. */
+  async function timeStretch(x, sr, rate, cancelled){
+    const len = x.length;
+    const N = 2 * Math.round(sr * 0.023);   // frame ≈ 46 ms
+    const Hs = N / 2;                        // synthesis hop (50% overlap)
+    const K = Math.max(2, Math.round(len / rate / Hs));
+    const L = K * Hs;
+    const Ha = len / K;                      // analysis hop
+    const D = Math.round(sr * 0.010);        // search tolerance
+    const P = N + 2*D + Hs + 8;              // circular padding on both sides
+    const ext = new Float32Array(len + 2*P);
+    for(let i=0;i<ext.length;i++){ ext[i] = x[(((i - P) % len) + len) % len]; }
+    const win = new Float32Array(N);
+    for(let i=0;i<N;i++) win[i] = 0.5 - 0.5*Math.cos(2*Math.PI*i/N);
+
+    // normalized cross-correlation between ext[a..] and ext[b..]
+    function corr(a, b, n, step){
+      let ab = 0, aa = 0, bb = 0;
+      for(let i=0;i<n;i+=step){
+        const va = ext[a+i], vb = ext[b+i];
+        ab += va*vb; aa += va*va; bb += vb*vb;
+      }
+      return ab / Math.sqrt(aa*bb + 1e-9);
+    }
+
+    const out = new Float32Array(L);
+    let prev = 0;
+    for(let k=0;k<K;k++){
+      let start = 0;
+      if(k > 0){
+        const nominal = Math.round(k * Ha);
+        const target = prev + Hs + P; // where the previous frame would naturally continue
+        let best = -Infinity, bestD = 0;
+        for(let d=-D; d<=D; d+=4){
+          const c = corr(nominal + d + P, target, Hs, 4);
+          if(c > best){ best = c; bestD = d; }
+        }
+        let bestFine = -Infinity, fineD = bestD;
+        for(let d=bestD-3; d<=bestD+3; d++){
+          if(d < -D || d > D) continue;
+          const c = corr(nominal + d + P, target, Hs, 2);
+          if(c > bestFine){ bestFine = c; fineD = d; }
+        }
+        start = nominal + fineD;
+      }
+      const s0 = start + P;
+      const base = k * Hs;
+      for(let i=0;i<N;i++){
+        out[(base + i) % L] += ext[s0 + i] * win[i];
+      }
+      prev = start;
+      if(k % 64 === 63){
+        await new Promise(r=> setTimeout(r, 0)); // keep the UI responsive
+        if(cancelled()) return null;
+      }
+    }
+    return out;
+  }
+
+  async function getStretchedBuffer(rate, cancelled){
+    if(stretchCache.has(rate)) return stretchCache.get(rate);
+    const src = recordedBuffer;
+    const data = await timeStretch(src.getChannelData(0), src.sampleRate, rate, cancelled);
+    if(!data) return null;
+    const buf = audioCtx.createBuffer(1, data.length, src.sampleRate);
+    buf.getChannelData(0).set(data);
+    stretchCache.set(rate, buf);
+    return buf;
+  }
+
+  /* ---- Playback speed ---- */
+  speedSlider.addEventListener('input', async e=>{
+    const rate = SPEEDS[parseInt(e.target.value,10)];
+    speedValue.textContent = rate + '×';
+    if(!recordedBuffer) return;
+    const token = ++stretchToken;
+    const src = recordedBuffer;
+    let buf = rate === 1 ? src : stretchCache.get(rate);
+    if(!buf){
+      loopStatus.textContent = '⏳ Adjusting speed…';
+      buf = await getStretchedBuffer(rate, ()=> token !== stretchToken || src !== recordedBuffer);
+      if(!buf || token !== stretchToken || src !== recordedBuffer) return;
+      refreshLoopStatus();
+    }
+    // Swap buffers, keeping the same spot in the loop (position is tracked on
+    // the original timeline, so it survives the change of buffer length).
+    const pos = currentPos();
+    const wasPlaying = !!loopSource;
+    playBuffer = buf;
+    playRate = src.duration / buf.duration;
+    posBase = pos;
+    if(wasPlaying) startSource(pos);
+    refreshLoopStatus();
+    playDurLabel.textContent = formatTimeTenths(playBuffer.duration);
+    renderPlayhead();
+  });
+
   mainBtn.addEventListener('click', ()=>{
     if(recording){ stopRecording(); }
-    else if(recordedBuffer){ clearLoop(); startRecording(); }
+    else if(recordedBuffer){
+      if(!confirm('Re-record? The current loop will be erased.')) return;
+      clearLoop(); startRecording();
+    }
     else { startRecording(); }
   });
   pauseBtn.addEventListener('click', togglePause);
@@ -1626,26 +1869,27 @@ async function getRawMicStream(){
     if(!recordedBuffer) return;
     trimContext = isFresh ? 'fresh' : 'edit';
     trimCancelBtn.textContent = isFresh ? '↩ Keep as-is' : '✖ Cancel';
-    if(loopGain) loopGain.gain.setValueAtTime(0, audioCtx.currentTime); // mute while editing
+    wasPlayingBeforeTrim = !!loopSource;
+    stopSource(); // silence the loop while editing (position is kept)
+    stopPlayAnim();
+    trimming = true;
     trimStartPct = 0;
     trimEndPct = 100;
     previewPlayheadPct = 0;
-    trimPanel.style.display = 'block';
-    // The canvas only has a real width once it's visible — wait a frame.
-    requestAnimationFrame(()=>{
-      drawWaveform();
-      updateHandlePositions();
-      updatePlayheadPosition();
-      updateTrimLabels();
-    });
+    showPlayer(true);
   }
 
-  function exitTrimMode(restoreVolume){
-    trimPanel.style.display = 'none';
+  // Leaves trim mode without touching playback or the player's visibility.
+  function exitTrimState(){
+    trimming = false;
     stopPreview();
-    if(restoreVolume && loopGain && !paused){
-      loopGain.gain.setValueAtTime(loopVolumeMultiplier, audioCtx.currentTime);
-    }
+  }
+
+  function exitTrimMode(restorePlayback){
+    exitTrimState();
+    if(restorePlayback && wasPlayingBeforeTrim && !paused) startSource(posBase);
+    wasPlayingBeforeTrim = false;
+    if(recordedBuffer) showPlayer(false);
   }
 
   function getTrimSampleRange(){
@@ -1718,14 +1962,16 @@ async function getRawMicStream(){
     }
     const newBuffer = audioCtx.createBuffer(1, endSample - startSample, recordedBuffer.sampleRate);
     newBuffer.getChannelData(0).set(recordedBuffer.getChannelData(0).subarray(startSample, endSample));
-    if(loopSource){ try{ loopSource.stop(); }catch(e){} loopSource = null; }
+    stopSource();
     recordedBuffer = newBuffer;
-    exitTrimMode(false);
+    posBase = 0;
+    wasPlayingBeforeTrim = false;
     startLoopPlayback();
   }
 
   function pctFromClientX(clientX){
     const rect = waveformWrap.getBoundingClientRect();
+    if(!rect.width) return 0;
     return Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
   }
 
@@ -1758,6 +2004,14 @@ async function getRawMicStream(){
   waveformWrap.addEventListener('pointerdown', e=>{
     if(e.target === trimHandleStart || e.target === trimHandleEnd) return;
     const pct = pctFromClientX(e.clientX);
+    if(!trimming){
+      // Playback mode: tap to seek
+      if(!recordedBuffer) return;
+      const target = (pct/100) * recordedBuffer.duration;
+      if(loopSource) startSource(target);
+      else { posBase = target; renderPlayhead(); }
+      return;
+    }
     previewPlayheadPct = Math.max(trimStartPct, Math.min(trimEndPct, pct));
     updatePlayheadPosition();
     stopPreview();
@@ -1770,7 +2024,7 @@ async function getRawMicStream(){
       // and start the loop with it.
       trimStartPct = 0;
       trimEndPct = 100;
-      exitTrimMode(false);
+      posBase = 0;
       startLoopPlayback();
     } else {
       exitTrimMode(true);
@@ -1779,7 +2033,10 @@ async function getRawMicStream(){
   trimPreviewBtn.addEventListener('click', previewTrim);
   trimApplyBtn.addEventListener('click', applyTrim);
   window.addEventListener('resize', ()=>{
-    if(trimPanel.style.display === 'block'){ drawWaveform(); updateHandlePositions(); updatePlayheadPosition(); }
+    if(player.style.display === 'block' && recordedBuffer){
+      drawWaveform(); updateHandlePositions();
+      if(trimming) updatePlayheadPosition(); else renderPlayhead();
+    }
   });
 
   /* ---- WAV export ---- */
@@ -1858,8 +2115,11 @@ async function getRawMicStream(){
           out[i] = sum / chans.length;
         }
       }
-      if(loopSource){ try{ loopSource.stop(); }catch(err){} loopSource = null; }
+      exitTrimState();
+      stopSource();
       recordedBuffer = mono;
+      posBase = 0;
+      wasPlayingBeforeTrim = false;
       startLoopPlayback();
     }catch(err){
       loopStatus.textContent = 'Could not read this audio file (' + (err.name || err.message || err) + ').';
@@ -1877,6 +2137,11 @@ async function getRawMicStream(){
     }
   });
 
+  TabLifecycle.registerToggle('loop', ()=>{
+    if(recording) stopRecording();
+    else if(trimming) previewTrim();
+    else if(recordedBuffer) togglePause();
+  });
   TabLifecycle.registerStop('loop', ()=>{
     if(recording){ stopRecording(); }
     if(isPreviewPlaying){ stopPreview(); }
@@ -1906,6 +2171,22 @@ async function getRawMicStream(){
       TabLifecycle.start(btn.dataset.tab);
     });
   });
+
+  // Space bar = play/pause of the current tab (metronome, loop).
+  // Left alone while typing in / operating a native control that uses space.
+  function handleSpace(e){
+    if(e.code !== 'Space' || e.ctrlKey || e.metaKey || e.altKey) return;
+    const t = e.target;
+    if(t && (t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' ||
+             (t.tagName === 'INPUT' && t.type !== 'range'))) return;
+    // Stop a focused button from also "clicking" itself on space
+    e.preventDefault();
+    if(e.type !== 'keydown' || e.repeat) return;
+    const active = document.querySelector('.tab-btn.active');
+    if(active) TabLifecycle.toggle(active.dataset.tab);
+  }
+  document.addEventListener('keydown', handleSpace);
+  document.addEventListener('keyup', e=>{ if(e.code === 'Space') handleSpace(e); });
 })();
 </script>
 </body>
