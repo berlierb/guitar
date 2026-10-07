@@ -1,0 +1,12 @@
+version: 2
+updates:
+  # Met à jour les hashes épinglés des actions GitHub
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  # Met à jour l'image de base nginx (tag + digest) du Dockerfile
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
